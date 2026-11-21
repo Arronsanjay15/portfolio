@@ -3,6 +3,7 @@ import {
   Menu, X, Mail, Linkedin, ExternalLink, Download, Award, GraduationCap,
   Code2, Globe, BarChart3, Sparkles, Wrench, Check, Copy, ArrowUp, ZoomIn,
 } from 'lucide-react';
+import CustomCursor from './components/CustomCursor';
 import './App.css';
 
 /* ---------- Content (edit here, not in the markup) ---------- */
@@ -12,6 +13,8 @@ const LINKEDIN = 'https://www.linkedin.com/in/arron-sanjay-732504353/';
 const RESUME = '/Arron_Sanjay_Resume.pdf';
 const YEAR = new Date().getFullYear();
 const HEADLINE = 'I build web apps and turn data into decisions.';
+// Words 5-8 ("turn data into decisions.") get the warm gold treatment in the headline.
+const ACCENT_WORDS = new Set([5, 6, 7, 8]);
 const TICKER = ['React', 'Node.js', 'Express.js', 'MongoDB', 'SQL', 'PHP', 'Python', 'Power BI', 'Excel', 'REST APIs', 'Data cleaning', 'Prompt engineering'];
 
 const NAV = [
@@ -36,8 +39,6 @@ const PROJECTS = [
     tags: ['Web app', 'Offline-first', 'Responsive'],
     img: '/projects/fitzone.png',
     cat: 'web',
-    pos: 'top',
-    bg: '#0a0c09',
     alt: 'FitZone workout planner interface',
     url: 'fitzonepro-zephyr.vercel.app',
     live: 'https://fitzonepro-zephyr.vercel.app/',
@@ -54,8 +55,6 @@ const PROJECTS = [
     tags: ['React', 'Node.js', 'Express.js', 'MongoDB'],
     img: '/projects/online%20examination.jpeg',
     cat: 'web',
-    pos: 'center', // crop position inside the hero stack; try 'top', 'center' or 'bottom'
-    bg: '#ffffff',
     alt: 'Online examination system interface',
     url: 'online-exam.local',
   },
@@ -71,8 +70,6 @@ const PROJECTS = [
     tags: ['PHP', 'SQL', 'XAMPP'],
     img: '/projects/lab_booking.png',
     cat: 'web',
-    pos: 'top',
-    bg: '#f3efe2',
     alt: 'Lab slot booking system interface',
     url: 'lab-booking.local',
   },
@@ -89,8 +86,6 @@ const PROJECTS = [
     img: '/projects/student_analysis.png',
     fallback: '/student_analysis.png', // tried automatically if the file sits in public/ instead of public/projects/
     cat: 'data',
-    pos: 'top',
-    bg: '#ffffff',
     alt: 'Power BI dashboard comparing student performance',
     url: 'student-performance.pbix',
   },
@@ -295,7 +290,6 @@ function App() {
 
   const barRef = useRef(null);
   const navRef = useRef(null);
-  const stackRef = useRef(null);
 
   // Scroll progress + nav background. Writes straight to the DOM, so no re-renders.
   useEffect(() => {
@@ -341,6 +335,28 @@ function App() {
     return () => io.disconnect();
   }, []);
 
+  // Reveal each marked element once, the first time it enters the viewport.
+  // Re-runs when the project list is remounted by a filter change.
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll('[data-reveal]'));
+    if (!els.length) return undefined;
+    if (!('IntersectionObserver' in window) ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      els.forEach((el) => el.classList.add('is-visible'));
+      return undefined;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [filter, tech]);
+
   // Escape closes the mobile menu and the screenshot viewer.
   useEffect(() => {
     const onKey = (e) => {
@@ -362,22 +378,6 @@ function App() {
     return () => { document.body.style.overflow = prev; };
   }, [lightbox]);
 
-  const tilt = (e) => {
-    const el = stackRef.current;
-    if (!el || e.pointerType !== 'mouse') return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty('--ry', `${(x * 12).toFixed(2)}deg`);
-    el.style.setProperty('--rx', `${(-y * 12).toFixed(2)}deg`);
-  };
-  const untilt = () => {
-    const el = stackRef.current;
-    if (!el) return;
-    el.style.setProperty('--ry', '0deg');
-    el.style.setProperty('--rx', '0deg');
-  };
-
   const magnet = (e) => {
     if (e.pointerType !== 'mouse') return;
     const el = e.currentTarget;
@@ -385,6 +385,21 @@ function App() {
     el.style.translate = `${((e.clientX - r.left - r.width / 2) * 0.22).toFixed(1)}px ${((e.clientY - r.top - r.height / 2) * 0.32).toFixed(1)}px`;
   };
   const unmagnet = (e) => { e.currentTarget.style.translate = ''; };
+
+  // Subtle pointer-driven 3D tilt for project cards (mouse only, no state updates).
+  const tiltProject = (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    el.style.setProperty('--prx', `${(-y * 5).toFixed(2)}deg`);
+    el.style.setProperty('--pry', `${(x * 5).toFixed(2)}deg`);
+  };
+  const untiltProject = (e) => {
+    e.currentTarget.style.setProperty('--prx', '0deg');
+    e.currentTarget.style.setProperty('--pry', '0deg');
+  };
 
   const copyEmail = async () => {
     try {
@@ -411,6 +426,7 @@ function App() {
 
   return (
     <div className="site">
+      <CustomCursor />
       <a className="skip-link" href="#projects">Skip to projects</a>
       <div className="progress" ref={barRef} aria-hidden="true" />
 
@@ -438,7 +454,8 @@ function App() {
                 {label}
               </a>
             ))}
-            <a className="nav-resume" href={RESUME} target="_blank" rel="noopener noreferrer">Resume</a>
+            <a className="nav-resume magnetic" href={RESUME} target="_blank" rel="noopener noreferrer"
+              onPointerMove={magnet} onPointerLeave={unmagnet}>Resume</a>
           </div>
         </div>
       </nav>
@@ -446,6 +463,7 @@ function App() {
       {/* Hero */}
       <header id="home" className="hero">
         <HeroField />
+        <div className="hero-aura" aria-hidden="true" />
         <div className="wrap hero-grid">
           <div className="hero-copy">
             <p className="status rise" style={{ '--d': '0ms' }}>
@@ -455,10 +473,11 @@ function App() {
             <h1 className="hero-title" aria-label={HEADLINE}>
               {HEADLINE.split(' ').map((word, i) => (
                 <span className="word" key={i} aria-hidden="true">
-                  <span style={{ '--i': i }}>{word}</span>
+                  <span className={ACCENT_WORDS.has(i) ? 'accent' : undefined} style={{ '--i': i }}>{word}</span>
                 </span>
               ))}
             </h1>
+            <span className="hero-rule" aria-hidden="true" />
             <p className="hero-intro rise" style={{ '--d': '750ms' }}>
               I’m Arron Sanjay, an MCA student working across full-stack development and data analytics:
               MERN apps on one side, Power BI reports on the other.
@@ -473,26 +492,6 @@ function App() {
               </a>
             </div>
           </div>
-
-          <div className="hero-visual" onPointerMove={tilt} onPointerLeave={untilt}>
-            <div className="stack" ref={stackRef}>
-              <div className="stack-inner">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className={`layer layer-${'abcd'[i]}`}>
-                    <Frame className="rise" url={PROJECTS[i].url}>
-                      <Shot project={PROJECTS[i]} style={{ background: PROJECTS[i].bg }} />
-                    </Frame>
-                  </div>
-                ))}
-
-                <div className="float-card float-live" aria-hidden="true">
-                  <div className="card-in rise" style={{ '--d': '1100ms' }}>
-                    <span className="status-dot" /> Live on Vercel
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="ticker" aria-hidden="true">
@@ -505,12 +504,12 @@ function App() {
       {/* Projects */}
       <section id="projects" className="section on-paper">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head" data-reveal>
             <h2>Projects</h2>
             <p>Four things I’ve built, from a deployed app to coursework with real data.</p>
           </div>
 
-          <div className="filters" role="group" aria-label="Filter projects">
+          <div className="filters" role="group" aria-label="Filter projects" data-reveal style={{ '--rd': '80ms' }}>
             {FILTERS.map(([id, label]) => (
               <button
                 key={id}
@@ -531,7 +530,14 @@ function App() {
 
           <div className="projects" key={`${filter}-${tech}`}>
             {visible.map((p, i) => (
-              <article key={p.title} className={`project ${i === 0 ? 'project-lead' : ''}`}>
+              <article
+                key={p.title}
+                className={`project ${i === 0 ? 'project-lead' : ''}`}
+                data-reveal
+                style={{ '--rd': `${i * 90}ms` }}
+                onPointerMove={tiltProject}
+                onPointerLeave={untiltProject}
+              >
                 <div className="project-text">
                   <p className="project-kind">{p.kind}</p>
                   <h3>{p.title}</h3>
@@ -576,22 +582,22 @@ function App() {
       <section id="about" className="section on-bone">
         <div className="wrap about-grid">
           <div>
-            <h2>About me</h2>
-            <p className="prose">
+            <h2 data-reveal>About me</h2>
+            <p className="prose" data-reveal style={{ '--rd': '90ms' }}>
               I’m an MCA student who likes building things people can use. On the web side that means the MERN stack,
               PHP, and SQL. On the data side it means cleaning messy datasets and turning them into clear reports
               with Power BI and Excel.
             </p>
-            <p className="prose">
+            <p className="prose" data-reveal style={{ '--rd': '150ms' }}>
               I pair the two on purpose: building the feature, then asking what the data says about it.
               I’m always picking up something new and putting it into a project.
             </p>
           </div>
           <dl className="facts">
-            <div><dt>Studying</dt><dd>MCA, Kristu Jyoti College of Management and Technology</dd></div>
-            <div><dt>Looking for</dt><dd>Internships and entry-level roles in software development or data analytics</dd></div>
-            <div><dt>Main tools</dt><dd>React, Node.js, MongoDB, SQL, Power BI</dd></div>
-            <div><dt>Languages</dt><dd>Malayalam (native), English and Hindi (proficient), French (beginner)</dd></div>
+            <div data-reveal style={{ '--rd': '80ms' }}><dt>Studying</dt><dd>MCA, Kristu Jyoti College of Management and Technology</dd></div>
+            <div data-reveal style={{ '--rd': '140ms' }}><dt>Looking for</dt><dd>Internships and entry-level roles in software development or data analytics</dd></div>
+            <div data-reveal style={{ '--rd': '200ms' }}><dt>Main tools</dt><dd>React, Node.js, MongoDB, SQL, Power BI</dd></div>
+            <div data-reveal style={{ '--rd': '260ms' }}><dt>Languages</dt><dd>Malayalam (native), English and Hindi (proficient), French (beginner)</dd></div>
           </dl>
         </div>
       </section>
@@ -599,7 +605,7 @@ function App() {
       {/* Skills */}
       <section id="skills" className="section on-moss">
         <div className="wrap">
-          <div className="section-head">
+          <div className="section-head" data-reveal>
             <h2>Skills</h2>
             <p>What I use day to day. Select a skill with a number to see the projects that use it.</p>
           </div>
@@ -633,14 +639,14 @@ function App() {
       <section id="education" className="section on-paper">
         <div className="wrap edu-grid">
           <div>
-            <h2>Education</h2>
+            <h2 data-reveal>Education</h2>
             <ol className="timeline">
-              <li>
+              <li data-reveal style={{ '--rd': '100ms' }}>
                 <p className="timeline-when">In progress</p>
                 <h3>Master of Computer Applications (MCA)</h3>
                 <p>Kristu Jyoti College of Management and Technology, Mahatma Gandhi University</p>
               </li>
-              <li>
+              <li data-reveal style={{ '--rd': '200ms' }}>
                 <p className="timeline-when">2025</p>
                 <h3>Bachelor of Commerce, Computer Applications</h3>
                 <p>Kristu Jyoti College of Management and Technology, Mahatma Gandhi University</p>
@@ -649,10 +655,10 @@ function App() {
           </div>
 
           <div>
-            <h2>Certifications</h2>
+            <h2 data-reveal>Certifications</h2>
             <ul className="certs">
-              {FEATURED_CERTS.map((c) => (
-                <li key={c.name}>
+              {FEATURED_CERTS.map((c, i) => (
+                <li key={c.name} data-reveal style={{ '--rd': `${100 + i * 90}ms` }}>
                   <Award size={20} aria-hidden="true" />
                   <div>
                     <h3>{c.name}</h3>
@@ -661,7 +667,7 @@ function App() {
                 </li>
               ))}
             </ul>
-            <details className="more-certs">
+            <details className="more-certs" data-reveal style={{ '--rd': '380ms' }}>
               <summary>
                 <GraduationCap size={18} aria-hidden="true" /> {MORE_CERTS.length} more certifications
               </summary>
@@ -679,24 +685,26 @@ function App() {
       <section id="contact" className="section on-moss contact">
         <div className="wrap contact-grid">
           <div>
-            <h2>Hiring for an internship or a junior role?</h2>
-            <p className="prose">
+            <h2 data-reveal>Hiring for an internship or a junior role?</h2>
+            <p className="prose" data-reveal style={{ '--rd': '90ms' }}>
               I’m looking for opportunities in software development or data analytics.
               Send a note and I’ll reply.
             </p>
-            <div className="contact-actions">
-              <button type="button" className="btn btn-primary" onClick={copyEmail}>
+            <div className="contact-actions" data-reveal style={{ '--rd': '150ms' }}>
+              <button type="button" className="btn btn-primary magnetic" onClick={copyEmail}
+                onPointerMove={magnet} onPointerLeave={unmagnet}>
                 {copied ? <Check size={18} /> : <Copy size={18} />}
                 {copied ? 'Email copied' : EMAIL}
               </button>
-              <a className="btn btn-line" href={LINKEDIN} target="_blank" rel="noopener noreferrer">
+              <a className="btn btn-line magnetic" href={LINKEDIN} target="_blank" rel="noopener noreferrer"
+                onPointerMove={magnet} onPointerLeave={unmagnet}>
                 <Linkedin size={18} /> LinkedIn
               </a>
             </div>
             <p className="sr-only" aria-live="polite">{copied ? 'Email address copied to clipboard' : ''}</p>
           </div>
 
-          <form className="form" onSubmit={sendDraft}>
+          <form className="form" onSubmit={sendDraft} data-reveal style={{ '--rd': '180ms' }}>
             <label>
               Your name
               <input
@@ -715,7 +723,7 @@ function App() {
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
               />
             </label>
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary magnetic" onPointerMove={magnet} onPointerLeave={unmagnet}>
               <Mail size={18} /> Open email draft
             </button>
             <p className="form-note">This opens a draft in your email app. Nothing is sent until you press send.</p>

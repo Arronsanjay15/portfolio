@@ -7,6 +7,11 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Keep anchored headings clear of the fixed navigation. */
+section[id], header[id] {
+  scroll-margin-top: 4.25rem;
+}
+
 body {
   margin: 0;
   min-width: 320px;
